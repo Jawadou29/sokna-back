@@ -18,7 +18,7 @@ const propertySchema = new mongoose.Schema({
   },
   serviceType: {
     type: String,
-    enum: ["rent by month", "rent by day", "sell", "rent by day & month"],
+    enum: ["rent by month", "rent by day", "sell"],
     required: true
   },
   propertyType: {
@@ -59,42 +59,56 @@ const propertySchema = new mongoose.Schema({
       required: true,
     }
   ],
-  rooms: [
-    {
-      _id: false,
-      _id: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Room",
-        required: true,
-      },
-      count: {
-        type: Number,
-        required: true,
-        min: 1,
+  rooms: {
+    type: [
+        {
+        _id: false,
+        _id: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Room",
+          required: true,
+        },
+        count: {
+          type: Number,
+          required: true,
+          min: 1,
+        }
       }
-    }
-  ],
+    ],
+    validate: {
+        validator: v => v.length > 0,
+        message: "At least one room is required"
+      },
+    required: true,
+  },
   nearbyPlaces: [
     {
       type: mongoose.Schema.Types.ObjectId,
       ref: "NearbyPlace",
     }
   ],
-  roomsImages: [
-    {
-      room: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Room",
-        required: true,
-      },
-      images: [
-        {
-          url: {type: String, required: true},
-          publicId: {type: String, required: true}
-        }
-      ]
-    }
-  ],
+  roomsImages: {
+    type: [
+      {
+        room: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Room",
+          required: true,
+        },
+        images: [
+          {
+            url: {type: String, required: true},
+            publicId: {type: String, required: true}
+          }
+        ]
+      }
+    ],
+    validate: {
+      validator: (v) => Array.isArray(v) && v.length > 0,
+      message: "At least one room with images is required"
+    },
+    required: true
+  },
   mainImages: [
     {
       url: {type: String, required: true},
@@ -102,7 +116,8 @@ const propertySchema = new mongoose.Schema({
     }
   ],
   price: {
-    type: mongoose.Schema.Types.Mixed,
+    type: Number,
+    min: 0,
     required: true,
   },
   deposite: {
@@ -125,30 +140,6 @@ propertySchema.virtual("Comments", {
   localField: "_id"
 })
 
-// make sure the data matches the service type
-propertySchema.path("price").validate(function (value) {
-  if (this.serviceType === "buy" && typeof value !== 'number') return false;
-  if (this.serviceType === "rent by day" && typeof value !== 'number') return false;
-  if (this.serviceType === "rent by month" && typeof value !== 'number') return false;
-  if (
-    this.serviceType == "rent by day & month" && 
-    (typeof value !== 'object' ||
-      value.perDay == null ||
-      value.perMonth == null)
-  ) {
-    return false;
-  }
-  return true;
-}, 'Invalid price format for the selected service type')
-
-
-
-// Virtual for Average Rating
-// propertySchema.virtual("averageRating").get(function () {
-//   if (this.rate.length === 0) return 0;
-//   const sum = this.rate.reduce((acc, item) => acc + item.rating, 0);
-//   return sum / this.rate.length;
-// });
 
 
 const Property = mongoose.model("Property", propertySchema);
@@ -163,42 +154,22 @@ function validatePropertyInfo(obj) {
     }).required(),
     title: joi.string().trim().min(10).required(),
     description: joi.string().trim().min(30).required(),
-    serviceType: joi.string().valid("rent by month", "rent by day", "sell", "rent by day & month").required(),
+    serviceType: joi.string().valid("rent by month", "rent by day", "sell").required(),
     propertyType: joi.string().required().trim(),
     address: joi.string().trim().required(),
     maxAdults: joi.number(),
     maxChilds: joi.number(),
     offers: joi.array().items(joi.string()),
-    rooms: joi.array().items(
+    rooms: joi.array().min(1).required().items(
       joi.object({
         _id: joi.string().required(),
         count: joi.number().min(1)
       })
     ),
     nearbyPlaces: joi.array().items(joi.string()),
-    price: joi.alternatives().conditional("serviceType", [
-      {
-        is: "sell",
-        then: joi.number().required()
-      },
-      {
-        is: "rent by day",
-        then: joi.number().required()
-      },
-      {
-        is: "rent by month",
-        then: joi.number().required()
-      },
-      {
-        is: "rent by day & month",
-        then: joi.object({
-          perDay: joi.number().required(),
-          perMonth: joi.number().required()
-        }).required()
-      },
-    ]),
+    price: joi.number().min(0).required(),
     deposite: joi.number().default(0),
-    roomsImages: joi.array().required(),
+    roomsImages: joi.array().min(1).required(),
   });
   return schema.validate(obj);
 }
@@ -220,32 +191,13 @@ function validateUpdateDetails(obj) {
   const schema = joi.object({
     title: joi.string().trim().min(10),
     description: joi.string().trim().min(30),
-    serviceType: joi.string().valid("rent by month", "rent by day", "sell", "rent by day & month"),
+    serviceType: joi.string().valid("rent by month", "rent by day", "sell"),
     propertyType: joi.string().trim(),
     address: joi.string().trim(),
     maxAdults: joi.number(),
     maxChilds: joi.number(),
-    price: joi.alternatives().conditional("serviceType", [
-      {
-        is: "sell",
-        then: joi.number().required()
-      },
-      {
-        is: "rent by day",
-        then: joi.number().required()
-      },
-      {
-        is: "rent by month",
-        then: joi.number().required()
-      },
-      {
-        is: "rent by day & month",
-        then: joi.object({
-          perDay: joi.number().required(),
-          perMonth: joi.number().required()
-        }).required()
-      },
-    ])
+    price: joi.number().min(0).required(),
+    deposite: joi.number()
   })
   return schema.validate(obj)
 }
@@ -289,28 +241,8 @@ function validateUpdateRoomsImages(obj) {
 // validate property price
 function validatePropertyPrice(obj) {
   const schema = joi.object({
-    serviceType: joi.string().valid("rent by month", "rent by day", "sell", "rent by day & month").required(),
-    price: joi.alternatives().conditional("serviceType", [
-      {
-        is: "sell",
-        then: joi.number().required()
-      },
-      {
-        is: "rent by day",
-        then: joi.number().required()
-      },
-      {
-        is: "rent by month",
-        then: joi.number().required()
-      },
-      {
-        is: "rent by day & month",
-        then: joi.object({
-          perDay: joi.number().required(),
-          perMonth: joi.number().required()
-        }).required()
-      },
-    ]),
+    serviceType: joi.string().valid("rent by month", "rent by day", "sell").required(),
+    price: joi.number().required().min(0),
     deposite: joi.number().default(0),
   })
   return schema.validate(obj)

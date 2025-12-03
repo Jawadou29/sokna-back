@@ -1,12 +1,11 @@
 const asyncHandler = require("express-async-handler");
 const bcrypt = require("bcryptjs");
 const { User, validateRegisterUser, validateLoginUser} = require("../models/User");
-const path = require("path");
-const { cloudinaryUploadImage } = require("../utils/cloudinary");
-const fs = require("fs");
 const VerificationToken = require("../models/VerificationToken");
 const crypto = require("crypto");
 const sendEmail = require("../utils/sendEmail");
+const { authMessages } = require("../translations/auth");
+
 
 /**
  * @desc register new User
@@ -15,16 +14,9 @@ const sendEmail = require("../utils/sendEmail");
  * @access public
 */
 const registerUserCtrl = asyncHandler(async (req, res) => {
-  // // validate image
-  // if (!req.file) {
-  //   return res.status(400).json({message: "No image provided."});
-  // }
-  // const imgPath = path.join(__dirname, `../images/${req.file.filename}`);
-
   // validate the data
   const { error } = validateRegisterUser(req.body);
   if (error) {
-    // fs.unlinkSync(imgPath);
     return res.status(400).json({message: error.details[0].message});
   }
 
@@ -32,35 +24,19 @@ const registerUserCtrl = asyncHandler(async (req, res) => {
   // check if the user exists
   let user = await User.findOne({email: req.body.email});
   if (user) {
-    // fs.unlinkSync(imgPath);
-    return res.status(400).json({message: "This email already exists."});
+    return res.status(400).json({message: authMessages[req.lang].emailExists});
   }
-
-  // check if the number already exists
-  // user = await User.findOne({ phoneNumber: req.body.phoneNumber });
-  // if (user) {
-  //   fs.unlinkSync(imgPath);
-  //   return res.status(400).json({ message: "This phone number is already registered." });
-  // }
 
   // hash the password
   const salt = await bcrypt.genSalt(10);
   const hashPassword = await bcrypt.hash(req.body.password, salt);
 
-  // upload image
-  // const result = await cloudinaryUploadImage(imgPath);
-  
   // save profile
   user = new User({
-    // photoProfile: {
-    //   url: result.url,
-    //   publicId: result.public_id,
-    // },
     firstName: req.body.firstName,
     lastName: req.body.lastName,
     email: req.body.email,
     password: hashPassword,
-    // phoneNumber: req.body.phoneNumber,
   })
   await user.save();
   // sending Email
@@ -82,10 +58,7 @@ const registerUserCtrl = asyncHandler(async (req, res) => {
   // send email
   await sendEmail(user.email, "Verify your Email", htmlTemple);
 
-  res.status(201).json({message: "We sent you an email, please verify your email address"});
-
-  // remove image from the server
-  // fs.unlinkSync(imgPath);
+  res.status(201).json({message: authMessages[req.lang].sendEmail});
 })
 
 
@@ -104,12 +77,12 @@ const loginUserCtrl = asyncHandler(async (req, res) => {
   // check if the user exists or not
   const user = await User.findOne({email: req.body.email});
   if (!user) {
-    return res.status(400).json({message: "Invalid login credentials"});
+    return res.status(400).json({message: authMessages[req.lang].invalidCredentials});
   }
   // check the password
   const isPasswordValid = await bcrypt.compare(req.body.password, user.password);
   if (!isPasswordValid) {
-    return res.status(400).json({message: "Invalid login credentials"});
+    return res.status(400).json({message: authMessages[req.lang].invalidCredentials});
   }
   // sending Email
   if (!user.isVerified) {
@@ -131,7 +104,7 @@ const loginUserCtrl = asyncHandler(async (req, res) => {
       `;
       await sendEmail(user.email, "verify your Email", htmlTemplate)
     }
-    return res.status(400).json({message: "we sent you an email, please verify your email address"})
+    return res.status(400).json({message: authMessages[req.lang].sendEmail});
   }
   // gen token
   const token = user.genrateToken();
@@ -154,19 +127,19 @@ const loginUserCtrl = asyncHandler(async (req, res) => {
 const verifyUserAccountCtrl = asyncHandler(async (req, res) => {
   const user = await User.findById(req.params.userId);
   if (!user) {
-    return res.status(400).json({message: "Invalid link"});    
+    return res.status(400).json({message: authMessages[req.lang].invalidLink});
   }
   const verificationToken = await VerificationToken.findOne({
     userId: user._id,
     token: req.params.token
   })
   if (!verificationToken) {
-    return res.status(400).json({message: "ivalid link"});
+    return res.status(400).json({message: authMessages[req.lang].invalidLink});
   }
   user.isVerified = true;
   await user.save();
   await VerificationToken.deleteOne({_id: verificationToken._id});
-  res.status(200).json({message: "your account Verified, please login"})
+  res.status(200).json({message: authMessages[req.lang].accountVerified})
 })
 
 module.exports = {

@@ -6,6 +6,7 @@ const fs = require("fs");
 const { cloudinaryUploadImage, cloudinaryDeleteImage, cloudinaryDeleteMany } = require("../utils/cloudinary");
 const { Property } = require("../models/Property");
 const { Comment } = require("../models/Comment");
+const { userMessages } = require("../translations/user");
 
 /**
  * @desc get all users
@@ -27,10 +28,16 @@ const getAllUsersCtrl = asyncHandler(async (req, res) => {
 */
 const getUserProfileCtrl = asyncHandler(async (req, res) => {
   const user = await User.findById(req.params.id)
-                          .populate("Properties", "city title address price serviceType propertyType mainImages rate")
+                          .populate({
+                            path: "Properties",
+                            select: "city title address price serviceType propertyType mainImages rate Comments",
+                            populate: {
+                              path: "Comments"
+                            }
+                          })
                           .select("-password");
   if (!user) {
-    return res.status(404).json({message: "User not found"})
+    return res.status(404).json({message: userMessages[req.lang].userNotFound})
   }
   res.status(200).json(user);
 })
@@ -75,7 +82,7 @@ const updateUserProfileCtrl = asyncHandler(async (req, res) => {
 
 
   res.status(200).json({
-    message: "Your personal info has been updated",
+    message: userMessages[req.lang].infoUpdated,
     updatedUser
   });
 })
@@ -97,7 +104,7 @@ const updatePasswordCtrl = asyncHandler(async (req, res) => {
   const isCurrentPasswordCorrect = await bcrypt.compare(req.body.currentPassword, user.password);
   // check the old password is correct
   if (!isCurrentPasswordCorrect) {
-    return res.status(400).json({message: "current password is not correct"});
+    return res.status(400).json({message: userMessages[req.lang].passwordNotCorrect});
   }
   // hash the new password
   const salt = await bcrypt.genSalt(10);
@@ -107,7 +114,7 @@ const updatePasswordCtrl = asyncHandler(async (req, res) => {
       password: req.body.newPassword,
     }
   })
-  res.status(200).json({message: "password has been updated"})
+  res.status(200).json({message: userMessages[req.body].passwordUpdated})
 })
 
 
@@ -120,7 +127,7 @@ const updatePasswordCtrl = asyncHandler(async (req, res) => {
 const updateProfieImgCtrl = asyncHandler(async (req, res) => {
   // validate image
   if (!req.file) {
-    return res.status(400).json({message: "There is no image provided"})
+    return res.status(400).json({message: userMessages[req.lang].noImgProvided})
   }
   // get path of the image
   const imgPath = path.join(__dirname, `../images/${req.file.filename}`);
@@ -140,7 +147,7 @@ const updateProfieImgCtrl = asyncHandler(async (req, res) => {
   };
   await user.save();
   res.status(200).json({
-    message: "your profile photo uploaded successefly",
+    message: userMessages[req.lang].photoUploaded,
     photoProfile: {url: result.secure_url, publicId: result.public_id}
   });
   // remove image from the server
@@ -159,7 +166,7 @@ const deleteUserProfileCtrl = asyncHandler(async (req, res) => {
   // check if the user exists
   const user = await User.findById(req.params.id);
   if (!user) {
-    return res.status(404).json({message: "User not found"});
+    return res.status(404).json({message: userMessages[req.lang].useNotFound});
   }
   // get all Properties
   const properties = await Property.find({owner: user._id});
@@ -184,7 +191,7 @@ const deleteUserProfileCtrl = asyncHandler(async (req, res) => {
   // delete user himself
   await User.findByIdAndDelete(req.params.id);
   // send response
-  res.status(200).json({message: "Your account has been deleted"});
+  res.status(200).json({message: userMessages[req.lang].accountDeleted});
 })
 
 
@@ -214,7 +221,7 @@ const addToSavedProperty = asyncHandler(async (req, res) => {
   // check if property exists
   const property = await Property.findById(req.body.propertyId);
   if (!property) {
-    return res.status(404).json({message: "Property not found"})
+    return res.status(404).json({message: userMessages[req.lang].propertyNotFound})
   }
 
   // add to saved if not exists
@@ -224,7 +231,7 @@ const addToSavedProperty = asyncHandler(async (req, res) => {
     {new: true}
   )
   res.status(200).json({
-    message: "Property saved",
+    message: userMessages[req.lang].propertySaved,
     updatedUser
   })
 })
@@ -241,7 +248,7 @@ const unsavePropertyCtrl = asyncHandler(async (req, res) => {
   // check if property exists
   const property = await Property.findById(propertyId);
   if (!property) {
-    return res.status(404).json({message: "Property not found"})
+    return res.status(404).json({message: userMessages[req.lang].propertyNotFound})
   }
   // unsave property
   const updatedUser = await User.findByIdAndUpdate(
@@ -250,7 +257,7 @@ const unsavePropertyCtrl = asyncHandler(async (req, res) => {
     {new: true}
   )
   res.status(200).json({
-    message: "Property unsaved",
+    message: userMessages[req.lang].propertyUnsaved,
     updatedUser
   })
 })
@@ -267,7 +274,7 @@ const getSavedProperties = asyncHandler(async (req, res) => {
     select: "city title serviceType propertyType mainImages price"
   });
   if (!user) {
-    return res.status(404).json({message: "User not found"});
+    return res.status(404).json({message: userMessages[req.lang].useNotFound});
   }
   res.status(200).json(user.saved)
 })

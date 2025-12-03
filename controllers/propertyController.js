@@ -5,6 +5,7 @@ const { cloudinaryDeleteMany, cloudinaryUploadImage } = require("../utils/cloudi
 const path = require("path");
 const { Comment } = require("../models/Comment");
 const { groupFilesByField, uploadFilesToCloudinary } = require("../utils/helpers");
+const { propertyMessages } = require("../translations/property");
 
 /**
  * @desc add new Property
@@ -19,14 +20,7 @@ const addNewPropertyCtrl = asyncHandler(async (req, res) => {
     req.body.nearbyPlaces = JSON.parse(req.body.nearbyPlaces || '[]');
     req.body.rooms = JSON.parse(req.body.rooms || '[]');
     req.body.roomsImages = JSON.parse(req.body.roomsImages || '[]');
-    // here
-    let price = req.body.price.trim();
-    if (price.startsWith("{") && price.endsWith("}")) {
-      req.body.price = JSON.parse(price)
-    }
-    else {
-      req.body.price = Number(price)
-    }
+  
     
     if (!Array.isArray(req.body.roomsImages)) {
       throw new Error('roomsImages must be an array');
@@ -39,14 +33,14 @@ const addNewPropertyCtrl = asyncHandler(async (req, res) => {
     // 3. Validate property info (title, price, etc.)
     const { error } = validatePropertyInfo(req.body);
     if (error) {
-      deleteFiles(req.files);
+      // deleteFiles(req.files);
       return res.status(400).json({ message: error.details[0].message });
     }
     // 4. Handle mainImages (require exactly 5)
     const mainFiles = filesByField.mainImages || [];
     if (mainFiles.length !== 5) {
       deleteFiles(req.files);
-      return res.status(400).json({ message: 'You must upload exactly 5 main images.' });
+      return res.status(400).json({ message: propertyMessages[req.lang].fiveImgs });
     }
     const mainImages = await uploadFilesToCloudinary(mainFiles);
 
@@ -65,7 +59,7 @@ const addNewPropertyCtrl = asyncHandler(async (req, res) => {
 
       if (!roomFiles.length) {
         deleteFiles(req.files);
-        return res.status(400).json({ message: `No images uploaded for room index ${i}` });
+        return res.status(400).json({ message: `${propertyMessages[req.lang].noImgsUploaded} ${i}` });
       }
 
       const uploaded = await uploadFilesToCloudinary(roomFiles);
@@ -97,13 +91,13 @@ const addNewPropertyCtrl = asyncHandler(async (req, res) => {
 
     const savedProperty = await property.save();
     res.status(201).json({
-      message: "Your property has been added successfully",
+      message: propertyMessages[req.lang].propertyAdded,
       id: savedProperty._id,
     });
 
   } catch (error) {
     deleteFiles(req.files);
-    res.status(400).json({ message: error.message || 'Invalid request' });
+    res.status(400).json({ message: error.message || propertyMessages[req.lang].invalidRequest });
   }
 })
 
@@ -118,7 +112,7 @@ const getAllPropertiesCtrl = asyncHandler(async (req, res) => {
   const {city, serviceType, pageNumber = 1, minPrice, maxPrice, propertyType, rooms} = req.query;
   const PROPERTY_PER_PAGE = 20;
   if (!city || !serviceType) {
-    return res.status(400).json({message: "City and type are required."})
+    return res.status(400).json({message: propertyMessages[req.lang].cityTypeRequired})
   }
 
   // Ensure pageNumber is a valid number
@@ -191,7 +185,7 @@ const getPropertyByIdCtrl = asyncHandler(async (req, res) => {
                                 })
   if (!property) {
     return res.status(404).json({ 
-      message: "Property with the given ID not found",
+      message: propertyMessages[req.lang].propertyNotFound,
       id: req.params.id
     });
   }
@@ -212,7 +206,7 @@ const getPropertyRoomsImages = asyncHandler(async (req, res) => {
                                 });;
   if (!property) {
     return res.status(404).json({
-      message: "Property with the given ID not found",
+      message: propertyMessages[req.lang].propertyNotFound,
       id: req.params.id
     })
   }
@@ -233,11 +227,11 @@ const updatePropertyLocatinoCtrl = asyncHandler(async (req, res) => {
   // check if property exists
   const property = await Property.findById(req.params.id);
   if (!property) {
-    return res.status(404).json({message: "Property not Found"});
+    return res.status(404).json({message: propertyMessages[req.lang].propertyNotFound});
   }
   // check if property belong to user
   if (req.user.id !== property.owner.toString()) {
-    return res.status(403).json({message: "You are not allowed to change info"})
+    return res.status(403).json({message: propertyMessages[req.lang].notAllowed})
   }
   // update Property
   const updatedProperty = await Property.findByIdAndUpdate(req.params.id, {
@@ -261,7 +255,7 @@ const updatePropertyLocatinoCtrl = asyncHandler(async (req, res) => {
                     model: "Room",
                   });
   res.status(200).json({
-    message: "Location has been updated successfully",
+    message: propertyMessages[req.lang].locationUpdated,
     updatedProperty
   });
 })
@@ -281,11 +275,11 @@ const updatePropertyDetailsCtrl = asyncHandler(async (req, res) => {
   // check if property exists
   const property = await Property.findById(req.params.id);
   if (!property) {
-    return res.status(404).json({message: "Property not Found"})
+    return res.status(404).json({message: propertyMessages[req.lang].propertyNotFound})
   }
   // check if property belong to user
   if (req.user.id !== property.owner.toString()) {
-    return res.status(403).json({message: "You are not allowed to change info"})
+    return res.status(403).json({message: propertyMessages[req.lang].notAllowed})
   }
   // update property
   const updatedProperty = await Property.findByIdAndUpdate(req.params.id, {
@@ -298,6 +292,7 @@ const updatePropertyDetailsCtrl = asyncHandler(async (req, res) => {
       maxAdults: req.body.maxAdults,
       maxChilds: req.body.maxChilds,
       price: req.body.price,
+      deposite: req.body.deposite
     }
   }, {new: true}).select("-roomsImages")
                   .populate("owner", ["-password"])
@@ -314,7 +309,7 @@ const updatePropertyDetailsCtrl = asyncHandler(async (req, res) => {
                     path: "rooms._id",
                     model: "Room",
                   });
-  res.status(200).json({message: "Details has been updated successfully", updatedProperty});
+  res.status(200).json({message: propertyMessages[req.lang].detailsUpdated, updatedProperty});
 })
 
 /**
@@ -325,22 +320,22 @@ const updatePropertyDetailsCtrl = asyncHandler(async (req, res) => {
 */
 const updateMainImagesCtrl = asyncHandler(async (req, res) => {
   if (!req.files) {
-    return res.status(400).json({message: "images not exists"});
+    return res.status(400).json({message: propertyMessages[req.lang].imagesNotExists});
   }
   if (req.files.length !== 5) {
     deleteFiles(req.files);
-    return res.status(400).json({message: "Please upload 5 images"});
+    return res.status(400).json({message: propertyMessages[req.lang].fiveImgs});
   }
   // check if property exists
   const property = await Property.findById(req.params.id);
   if (!property) {
     deleteFiles(req.files);
-    return res.status(404).json({message: "Property not found"});
+    return res.status(404).json({message: propertyMessages[req.lang].propertyNotFound});
   }
   // check if property belong to user
   if (req.user.id !== property.owner.toString()) {
     deleteFiles(req.files);
-    return res.status(403).json({message: "You are not allowed"});
+    return res.status(403).json({message: propertyMessages[req.lang].notAllowed});
   }
   // delete old main images
   const oldPublicIds = property.mainImages.map(img => img.publicId);
@@ -371,7 +366,7 @@ const updateMainImagesCtrl = asyncHandler(async (req, res) => {
                     model: "Room",
                   });
   deleteFiles(req.files);
-  res.status(200).json({message: "Main images has been updated successefly", updatedProperty})
+  res.status(200).json({message: propertyMessages[req.lang].mainImagesUpdated, updatedProperty})
 })
 
 /**
@@ -389,11 +384,11 @@ const updateOffersCtrl = asyncHandler(async (req, res) => {
   // check if property exists
   const property = await Property.findById(req.params.id);
   if (!property) {
-    return res.status(404).json({message: "Property not Found"})
+    return res.status(404).json({message: propertyMessages[req.lang].propertyNotFound})
   }
   // check if property belong to user
   if (req.user.id !== property.owner.toString()) {
-    return res.status(403).json({message: "You are not allowed to change info"})
+    return res.status(403).json({message: propertyMessages[req.lang].notAllowed})
   }
   // update data
   const updatedProperty = await Property.findByIdAndUpdate(req.params.id, {
@@ -415,7 +410,7 @@ const updateOffersCtrl = asyncHandler(async (req, res) => {
                     path: "rooms._id",
                     model: "Room",
                   });
-  res.status(200).json({message: "Offers has been updated successefly", updatedProperty})
+  res.status(200).json({message: propertyMessages[req.lang].offersUpdated, updatedProperty})
 })
 
 /**
@@ -433,11 +428,11 @@ const updateNearbyPlacesCtrl = asyncHandler(async (req, res) => {
   // check if property exists
   const property = await Property.findById(req.params.id);
   if (!property) {
-    return res.status(404).json({message: "Property not Found"})
+    return res.status(404).json({message: propertyMessages[req.lang].propertyNotFound})
   }
   // check if property belong to user
   if (req.user.id !== property.owner.toString()) {
-    return res.status(403).json({message: "You are not allowed to change info"})
+    return res.status(403).json({message: propertyMessages[req.lang].notAllowed})
   }
   // update data
   const updatedProperty = await Property.findByIdAndUpdate(req.params.id, {
@@ -459,7 +454,7 @@ const updateNearbyPlacesCtrl = asyncHandler(async (req, res) => {
                     path: "rooms._id",
                     model: "Room",
                   });
-  res.status(200).json({message: "Nearby places has been updated successefly", updatedProperty});
+  res.status(200).json({message: propertyMessages[req.lang].nearbyPlacesUpdated, updatedProperty});
 })
 
 /**
@@ -474,7 +469,7 @@ const updateRoomsAndImagesCtrl = asyncHandler(async (req, res) => {
 
   // check if files exists
   if (!req.files || !req.files.length) {
-    return res.status(400).json({message: "Missing images"});
+    return res.status(400).json({message: propertyMessages[req.lang].missingImages});
   }
   // validate data
   const { error } = validateUpdateRooms(req.body);
@@ -486,11 +481,11 @@ const updateRoomsAndImagesCtrl = asyncHandler(async (req, res) => {
   // check if property exists
   const property = await Property.findById(req.params.id);
   if (!property) {
-    return res.status(404).json({message: "Property not Found"})
+    return res.status(404).json({message: propertyMessages[req.lang].propertyNotFound})
   }
   // check if property belong to user
   if (req.user.id !== property.owner.toString()) {
-    return res.status(403).json({message: "You are not allowed to change info"})
+    return res.status(403).json({message: propertyMessages[req.lang].notAllowed})
   }
 
   // Handle roomsImages uploads
@@ -508,7 +503,7 @@ const updateRoomsAndImagesCtrl = asyncHandler(async (req, res) => {
 
       if (!roomFiles.length) {
         deleteFiles(req.files);
-        return res.status(400).json({ message: `No images uploaded for room index ${i}` });
+        return res.status(400).json({ message: `${propertyMessages[req.lang].noImgsUploaded} ${i}` });
       }
 
       const uploaded = await uploadFilesToCloudinary(roomFiles);
@@ -540,7 +535,7 @@ const updateRoomsAndImagesCtrl = asyncHandler(async (req, res) => {
                     model: "Room",
                   });
     deleteFiles(req.files);
-    res.status(200).json({message: "Property rooms updated successefly", updatedProperty});
+    res.status(200).json({message: propertyMessages[req.lang].roomsUpdated, updatedProperty});
 })
 
 /**
@@ -554,7 +549,7 @@ const updateRoomsImagesCtrl = asyncHandler(async (req, res) => {
 
   // check if files exists
   if (!req.files || !req.files.length) {
-    return res.status(400).json({message: "Missing images"});
+    return res.status(400).json({message: propertyMessages[req.lang].missingImages});
   }
   // validate data
   const { error } = validateUpdateRoomsImages(req.body);
@@ -565,11 +560,11 @@ const updateRoomsImagesCtrl = asyncHandler(async (req, res) => {
   // check if property exists
   const property = await Property.findById(req.params.id);
   if (!property) {
-    return res.status(404).json({message: "Property not Found"})
+    return res.status(404).json({message: propertyMessages[req.lang].propertyNotFound})
   }
   // check if property belong to user
   if (req.user.id !== property.owner.toString()) {
-    return res.status(403).json({message: "You are not allowed to change info"})
+    return res.status(403).json({message: propertyMessages[req.lang].notAllowed})
   }
 
   // Handle roomsImages uploads
@@ -587,7 +582,7 @@ const updateRoomsImagesCtrl = asyncHandler(async (req, res) => {
 
       if (!roomFiles.length) {
         deleteFiles(req.files);
-        return res.status(400).json({ message: `No images uploaded for room index ${i}` });
+        return res.status(400).json({ message: `${propertyMessages[req.lang].noImgsUploaded} ${i}` });
       }
 
       const uploaded = await uploadFilesToCloudinary(roomFiles);
@@ -617,7 +612,7 @@ const updateRoomsImagesCtrl = asyncHandler(async (req, res) => {
                     model: "Room",
                   });
     deleteFiles(req.files);
-    res.status(200).json({message: "Rooms Images updated successefly", updatedProperty});
+    res.status(200).json({message: propertyMessages[req.lang].roomsImagesUpdated, updatedProperty});
 })
 
 /**
@@ -635,16 +630,17 @@ const updatePropertyPriceCtrl = asyncHandler(async (req, res) => {
   // check if property exists
   const property = await Property.findById(req.params.id);
   if (!property) {
-    return res.status(404).json({message: "Property not Found"})
+    return res.status(404).json({message: propertyMessages[req.lang].propertyNotFound})
   }
   // check if property belong to user
   if (req.user.id !== property.owner.toString()) {
-    return res.status(403).json({message: "You are not allowed to change info"})
+    return res.status(403).json({message: propertyMessages[req.lang].notAllowed})
   }
   // update property
   const updatedProperty = await Property.findByIdAndUpdate(req.params.id, {
     $set: {
       price: req.body.price,
+      deposite: req.body.deposite,
     }
   }, {new: true}).select("-roomsImages")
                   .populate("owner", ["-password"])
@@ -661,7 +657,7 @@ const updatePropertyPriceCtrl = asyncHandler(async (req, res) => {
                     path: "rooms._id",
                     model: "Room",
                   });
-  res.status(200).json({message: "Details has been updated successfully", updatedProperty});
+  res.status(200).json({message: propertyMessages[req.lang].priceUpdated, updatedProperty});
 })
 
 /**
@@ -674,7 +670,7 @@ const deletePropertyCtrl = asyncHandler(async (req, res) => {
   // check if the property exists
   const property = await Property.findById(req.params.id);
   if (!property) {
-    return res.status(404).json({message: "property not found"});
+    return res.status(404).json({message: propertyMessages[req.lang].propertyNotFound});
   }
   // check if the user allowed to delete the property
   if (req.user.role === "admin" || req.user.id === property.owner.toString()) {
@@ -689,12 +685,12 @@ const deletePropertyCtrl = asyncHandler(async (req, res) => {
     // remove comments
     await Comment.deleteMany({propertyId: property._id});
     res.status(200).json({
-      message: "property has been deleted",
+      message: propertyMessages[req.lang].notAllowedToDelete,
       propertyId: property._id,
     })
   }
   else{
-    res.status(403).json({message: "access denied"});
+    res.status(403).json({message: propertyMessages[req.lang].propertyDeleted});
   }
 
 })
@@ -721,7 +717,7 @@ const addRatingCtrl = asyncHandler(async (req, res) => {
   // check if the property exists
   let property = await Property.findById(propertyId);
   if (!property) {
-    return res.status(404).json({message: "property not found"});
+    return res.status(404).json({message: propertyMessages[req.lang].propertyNotFound});
   }
 
   // check if the user already rate the property
@@ -730,13 +726,13 @@ const addRatingCtrl = asyncHandler(async (req, res) => {
     // update the rate
     isPropertyAlreadyRated.rating = rating;
     await property.save();
-    return res.status(200).json({ message: "Rating updated successfully" });
+    return res.status(200).json({ message: propertyMessages[req.lang].ratingAdded });
   }
   else{
     // add new rate
     property.rate.push({user: loggedInUser, rating});
     await property.save();
-    return res.status(200).json({ message: "Rating added successfully" });
+    return res.status(200).json({ message: propertyMessages[req.lang].ratingUpdated });
   }
 });
 

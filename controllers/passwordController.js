@@ -4,6 +4,7 @@ const {User, validateEmail, validateNewPassword} = require("../models/User");
 const VerificationToken = require("../models/VerificationToken");
 const crypto = require("crypto");
 const sendEmail = require("../utils/sendEmail");
+const { passwordMessages } = require("../translations/password");
 
 /**-----------------------------------
  * @desc send reset password link
@@ -20,7 +21,7 @@ const sendResetPasswordLinkCtrl = asyncHandler(async (req, res) => {
   // get user from db
   const user = await User.findOne({email: req.body.email});
   if (!user) {
-    return res.status(404).json({message: "Email not found"});
+    return res.status(404).json({message: passwordMessages[req.lang].EmailNotFound});
   }
   // create Verification Token
   let verificationToken = await VerificationToken.findOne({userId: user._id});
@@ -39,7 +40,7 @@ const sendResetPasswordLinkCtrl = asyncHandler(async (req, res) => {
   // send link to temail
   await sendEmail(user.email, "Reset your password", htmlTemplate);
   // response to client
-  res.status(200).json({message: "Password reset link sent to your Email, please check your inbox"})
+  res.status(200).json({message: passwordMessages[req.lang].passwordLinkSend})
 })
 
 /**-----------------------------------
@@ -51,16 +52,16 @@ const sendResetPasswordLinkCtrl = asyncHandler(async (req, res) => {
 const getResetPasswordLinkCtrl = asyncHandler(async (req, res) => {
   const user = await User.findById(req.params.userId);
   if (!user) {
-    return res.status(400).json({message: "Invalid link"})
+    return res.status(400).json({message: passwordMessages[req.lang].invalidLink})
   }
   const verificationToken = await VerificationToken.findOne({
     userId: user._id,
     token: req.params.token
   });
   if (!verificationToken) {
-    return res.status(400).json({message: "Invalid link"});
+    return res.status(400).json({message: passwordMessages[req.lang].invalidLink});
   }
-  res.status(200).json({message: "valid URL"});
+  res.status(200).json({message: passwordMessages[req.lang].validUrl});
 })
 
 /**-----------------------------------
@@ -78,14 +79,14 @@ const resetPasswordCtrl = asyncHandler(async (req, res) => {
   // check if user exists
   const user = await User.findById(req.params.userId);
   if (!user) {
-    return res.status(404).json({message: "Invalid link"});
+    return res.status(404).json({message: passwordMessages[req.lang].invalidLink});
   }
   const verificationToken = await VerificationToken.findOne({
     userId: user._id,
     token: req.params.token
   })
   if (!verificationToken) {
-    return res.status(400).json({message: "Invalid link"})
+    return res.status(400).json({message: passwordMessages[req.lang].invalidLink})
   }
   if (!user.isVerified) {
     user.isVerified = true;
@@ -95,7 +96,7 @@ const resetPasswordCtrl = asyncHandler(async (req, res) => {
   user.password = hashPassword;
   await user.save();
   await VerificationToken.deleteOne({_id: verificationToken._id});
-  res.status(200).json({message: "password reset successfuly, please login"})
+  res.status(200).json({message: passwordMessages[req.lang].passwordResetSucc})
 })
 
 module.exports = {

@@ -2,6 +2,7 @@ const express = require("express");
 const connectToDB = require("./config/connectToDB");
 const { notFound, errorHandler } = require("./middlewares/error");
 const cors = require("cors");
+const { setLanguage } = require("./middlewares/setLanguage");
 require("dotenv").config();
 
 
@@ -22,6 +23,7 @@ connectToDB();
 
 // middlewares
 app.use(express.json());
+app.use(setLanguage);
 
 
 

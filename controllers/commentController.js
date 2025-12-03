@@ -2,6 +2,8 @@ const asyncHandler = require("express-async-handler");
 const { Comment, validateNewComment, validateUpdateComment } = require("../models/Comment");
 const { Property } = require("../models/Property");
 const { User } = require("../models/User");
+const { commentMessages } = require("../translations/comment");
+
 
 /**
  * @desc add new comment
@@ -19,7 +21,7 @@ const addNewCommentCtrl = asyncHandler(async (req, res) => {
   // Fetch user and check property existence concurrently
   const propertyExists = await Property.exists({ _id: req.body.propertyId });
   if (!propertyExists) {
-    return res.status(404).json({message: "Property not found"});
+    return res.status(404).json({message: commentMessages[req.lang].propertyNotFound});
   }
   
   const alreadyComment = await Comment.findOne({
@@ -31,7 +33,7 @@ const addNewCommentCtrl = asyncHandler(async (req, res) => {
     alreadyComment.text = req.body.text;
     alreadyComment.rate = req.body.rate;
     await alreadyComment.save();
-    return res.status(201).json({message: "Your comment has been updated"})
+    return res.status(201).json({message: commentMessages[req.lang].commentUpdated})
   }
   
   // add comment to db
@@ -47,7 +49,7 @@ const addNewCommentCtrl = asyncHandler(async (req, res) => {
   // const populatedComment = await savedComment.populate("user", ["photoProfile", "firstName", "lastName", "createdAt"]);
 
 
-  res.status(201).json({message: "comment added successefuly"});
+  res.status(201).json({message: commentMessages[req.lang].commentAdded});
 })
 
 
@@ -66,11 +68,11 @@ const updateCommentCtrl = asyncHandler(async (req, res) => {
   // check if comment exists
   const comment = await Comment.findById(req.params.id);
   if (!comment) {
-    return res.status(404).json({message: "Comment not found"});
+    return res.status(404).json({message: commentMessages[req.lang].commentNotFound});
   }
   // check the permission
   if (req.user.id !== comment.user.toString()) {
-    return res.status(403).json({message: "You are not allowed to change this comment"});
+    return res.status(403).json({message: commentMessages[req.lang].notAllowed});
   }
   // update the comment
   const newComment = await Comment.findByIdAndUpdate(req.params.id, {
@@ -90,14 +92,14 @@ const updateCommentCtrl = asyncHandler(async (req, res) => {
 const deleteCommentCtrl = asyncHandler(async (req, res) => {
   const comment = await Comment.findById(req.params.id);
   if (!comment) {
-    return res.status(400).json({message: "comment not found"});
+    return res.status(400).json({message: commentMessages[req.lang].commentNotFound});
   }
   if (req.user.role === "admin" || req.user.id === comment.user.toString()) {
     await Comment.findByIdAndDelete(req.params.id);
-    res.status(201).json({message: "Comment has been deleted"});
+    res.status(201).json({message: commentMessages[req.lang].commentDeleted});
   }
   else{
-    res.status(400).json({message: "not allowed to delete this message"});
+    res.status(400).json({message: commentMessages[req.land].notAllowedToDelete});
   }
 })
 
