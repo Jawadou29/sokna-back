@@ -37,6 +37,9 @@ app.use("/api/offers/", require("./routes/offersRoutes"));
 app.use("/api/rooms/", require("./routes/roomosRoutes"));
 app.use("/api/nearby/", require("./routes/nearbyPlacesRoutes"));
 app.use("/api/password/", require("./routes/passwordRoutes"));
+app.use("/api/admin/", require("./routes/adminDashboardRoutes"));
+app.use("/api/admin/properties", require("./routes/adminPropertiesRoutes"));
+app.use("/api/admin/users", require("./routes/adminUsersRoutes"));
 
 // error handler
 app.use(notFound)

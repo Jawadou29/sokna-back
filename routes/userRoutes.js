@@ -27,7 +27,8 @@ router.get("/profile", verifyTokenAndAdmin, getAllUsersCtrl);
 router.get("/profile/count", verifyTokenAndAdmin, getUsersCount);
 
 // /api/users/profile/:id
-router.get("/profile/:id", validateObjectId, verifyToken, getUserProfileCtrl);
+// router.get("/profile/:id", validateObjectId, verifyToken, getUserProfileCtrl);
+router.get("/profile/:id", validateObjectId,  getUserProfileCtrl);
 router.put(
   "/profile/:id",
   validateObjectId,

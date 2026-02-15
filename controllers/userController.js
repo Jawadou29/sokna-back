@@ -27,6 +27,7 @@ const getAllUsersCtrl = asyncHandler(async (req, res) => {
  * @access private (loged in user) 
 */
 const getUserProfileCtrl = asyncHandler(async (req, res) => {
+  console.log("heeeeeeeeeeeeeerrrrrrrrreeeeeeeeeee")
   const user = await User.findById(req.params.id)
                           .populate({
                             path: "Properties",
