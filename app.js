@@ -48,6 +48,11 @@ app.use(errorHandler)
 // run the server
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
-  console.log(`server is running in ${process.env.NODE_ENV} mode on port ${PORT}`);
-})
+// app.listen(PORT, () => {
+//   console.log(`server is running in ${process.env.NODE_ENV} mode on port ${PORT}`);
+// })
+
+
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
+});
